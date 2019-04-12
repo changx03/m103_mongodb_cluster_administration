@@ -2,3 +2,6 @@ mongod --dbpath /data/db/ --port 27000 --bind_ip "192.168.103.100,127.0.0.1" --a
 
 # create all Parent folder
 mkdir -p /var/mongodb/data/db
+
+# use `chown` to change the owner of this directory to vagrant:vagrant
+sudo chown vagrant:vagrant /var/mongodb/db
