@@ -4,4 +4,10 @@ mongod --dbpath /data/db/ --port 27000 --bind_ip "192.168.103.100,127.0.0.1" --a
 mkdir -p /var/mongodb/data/db
 
 # use `chown` to change the owner of this directory to vagrant:vagrant
-sudo chown vagrant:vagrant /var/mongodb/db
+sudo chown vagrant:vagrant /var/mongodb
+
+# tail the log file
+tail -f /var/mongodb/log/mongod.log
+
+# filter `storage` in mongod.log file
+grep -R 'storage' /var/mongodb/log/mongod.log
