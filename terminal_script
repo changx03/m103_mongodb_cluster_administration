@@ -11,3 +11,6 @@ tail -f /var/mongodb/log/mongod.log
 
 # filter `storage` in mongod.log file
 grep -R 'storage' /var/mongodb/log/mongod.log
+
+# open mongo shell with auth
+mongo --port 27000 -u m103-admin -p m103-pass --authenticationDatabase admin
