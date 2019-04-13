@@ -14,3 +14,30 @@ grep -R 'storage' /var/mongodb/log/mongod.log
 
 # open mongo shell with auth
 mongo --port 27000 -u m103-admin -p m103-pass --authenticationDatabase admin
+
+# find PID for mongod
+ps -et | grep mongod
+
+# kill PID
+sudo kill <pid>
+
+# give R/W rights to user
+chown <user> <file>
+
+# find all files start with "mongo"
+find /usr/bin/ -name "mongo*"
+
+# mongodb statistics monitor
+mongostat --port 27000 -u m103-admin -p m103-pass --authenticationDatabase admin
+
+# dump a collection
+mongodump --port 27000 -u m103-admin -p m103-pass --authenticationDatabase admin --db newDB --collection col
+
+# restore a collection from dump BSON file
+mongorestore --port 27000 -u m103-admin -p m103-pass --authenticationDatabase admin --drop dump/
+
+# export db
+mongoexport --port 27000 -u m103-admin -p m103-pass --authenticationDatabase admin --db newDB --collection col -o col.backup.json
+
+# Chapter 1 Lab - Importing a Dataset
+mongoimport --port 27000 -u m103-application-user -p m103-application-pass --authenticationDatabase admin --db applicationData --collection products products.json
