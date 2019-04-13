@@ -44,3 +44,30 @@ db.createUser({
 
 // auth user and then run
 db.stats()
+
+db.createUser({
+  user: 'security_officer',
+  pwd: 'security',
+  roles: [{ db: 'admin', role: 'userAdmin' }]
+})
+
+db.createUser({
+  user: 'db_user',
+  pwd: 'db_pass',
+  roles: [{ db: 'newDB', role: 'dbAdmin' }, { db: 'newDB', role: 'readWrite' }]
+})
+
+db.grantRolesToUser('db_user', [{ db: 'example', role: 'dbOwner' }])
+
+// show current user
+db.runCommand({ connectionStatus: 1 })
+
+// show role's privileges
+db.runCommand({ rolesInfo: { role: 'dbOwner', db: 'newDB' }, showPrivileges: true })
+
+
+db.createUser({
+  user: 'm103-application-user',
+  pwd: 'm103-application-pass',
+  roles: [{ db: 'applicationData', role: 'readWrite' }]
+})
