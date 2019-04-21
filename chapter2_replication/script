@@ -1,0 +1,39 @@
+// create folder
+$ mkdir -p /var/mongodb/pki
+
+// generate base64 private key
+$ openssl rand -base64 741 > /var/mongodb/pki/m103-keyfile
+
+// clear current terminal line
+// ctrl + U
+
+// give read right
+$ chmod 600 /var/mongodb/pki/m103-keyfile
+
+// create folder for db and log file
+$ mkdir -p /var/mongodb/db/node1
+$ sudo mkdir -p /var/mongodb/log/node1
+$ sudo touch /var/mongodb/log/node1/mongo.log
+$ sudo chown vagrant:vagrant  /var/mongodb/log/node1/mongo.log
+
+// copy node1.cfg
+$ cp node1.cfg node2.cfg
+
+// init replica set
+> rs.initiate()
+
+// create admin user and then exit mongodb, include the name of replica set into the host name
+$ mongo --host "m103-example/192.168.103.100:27000" -u m103-admin -p m103-pass --authenticationDatabase admin
+
+// show replica set status
+> rs.status()
+
+// add replica set
+> rs.add('192.168.103.100:27001')
+> rs.add('192.168.103.100:27002')
+
+// force current primary node to step down
+> rs.stepDown()
+
+// verify which one is primary
+> rs.isMaster() 
