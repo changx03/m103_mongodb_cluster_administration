@@ -69,7 +69,7 @@ mongod -f node2.conf
 mongod -f node3.conf
 ```
 
-to update config file:
+to update config file on running replica set:
 
 * update the secondary node first
 * step down the primary
