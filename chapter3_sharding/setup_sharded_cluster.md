@@ -202,6 +202,8 @@ sh.shardCollection("<db>.<coll>", { "<shard_key>": 1 })
 sh.status()
 ```
 
+> compound index can be used as shard key!
+
 ## Lecture: Picking shard key
 
 Not all collection need to be sharded.
@@ -309,3 +311,130 @@ sh.status()
 ```
 
 ## Lecture: Chunks
+
+from `mongos`
+
+```javascript
+use config
+show collections
+db.chunks.findOne()
+```
+
+inclusive minimum and exclusive maximum
+
+ChunkSize = 64MB
+
+1MB <= ChunkSize <= 1024MB
+
+Change chunk size to 2MB
+
+```javascript
+use config
+db.settings.save({_id: "chunksize", value: 2})
+```
+
+### Jumbo chunks can be **very damaging**
+
+* larger than defined chunk size
+* cannot move
+
+increasing chunk size can help eliminate jumbo chunks
+
+## Lab 3 - Documents in Chunks
+
+```bash
+mongoimport --drop /dataset/products.json --port 26000 -u "m103-admin" \
+-p "m103-pass" --authenticationDatabase "admin" \
+--db m103 --collection products
+```
+
+from `mongos`
+
+```bash
+mongo --port 26000 -u "m103-admin" -p "m103-pass" --authenticationDatabase admin
+```
+
+```javascript
+use m103
+db.products.createIndex({"sku":1})
+
+sh.enableSharding("m103")
+db.adminCommand({shardCollection: "m103.products", key: {sku: 1}})
+
+db.getSiblingDB("m103").products.find({"sku" : 21572585 })
+
+use config
+db.chunks.find().pretty()
+```
+
+```bash
+validate_lab_document_chunks "m103.products-sku_21570757"
+```
+
+## Lecture: Balancing
+
+`Balancer` runs on primary node of config server replica set
+
+Balancer round: `floor(n / 2)` where `n` is # of shards (e.g. 3 shards can migrate 1 at a time, 4 has 2)
+
+```javascript
+sh.startBalancer(<timeout>, <interval>)
+sh.stopBalancer(<timeout>, <interval>)
+sh.setBalancerState(<boolean>)
+```
+
+## Lecture: Queries in a shard cluster
+
+```javascript
+db.products.find({ name: 'How To Mongo' })
+```
+
+1. determine which shard (all, or a subset)
+1. if query predicate includes the shard key, `mongos` can target to the shards which contain the values - very efficient
+1. if not include, or range query, `mongos` will target all shards - very slow
+1. Each shard has a cursor, `mongos` receives a set of response and merge them
+
+### `sort()`
+
+`mongos` pushes `sort` on each shard and merge-sorts the results
+
+### `limit()`
+
+`mongos` pushes `limit` to targeted shards and re-applies the limit to merged the results
+
+### `skip()`
+
+`mongos` performs `skip` against the merged results
+
+## Lecture: Routed queries VS Scatter gather
+
+```javascript
+use m103
+// check products collection
+show collections
+
+// contains 2 shards
+sh.status()
+
+// routed query:
+// "SINGLE_SHARD" <- "FETCH" <- "SHARDING_FILTER" <- "IXSCAN"
+db.products.find({"sku" : 1000000749 }).explain()
+
+// scatter gather query:
+// "SHARD_MERGE" <- "SHARDING_FILTER" <- "COLLSCAN"
+db.products.find( { name: "Gods And Heroes: Rome Rising - Windows [Digital Download]" }).explain()
+```
+
+"SINGLE_SHARD": doesn't need merge in `mongos`
+
+Both queries return same result. Because we use `sku` as shard key, 1st query is faster.
+
+If we run the query frequently, it's better to use `name` as shard key!
+
+## Lab 4: Detect Scatter Gather Queries
+
+```javascript
+var exp = db.products.explain("executionStats")
+exp.find({"sku": 23153496})
+exp.find({"shippingWeight": 1.00})
+```
