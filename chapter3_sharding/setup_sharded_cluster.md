@@ -1,4 +1,6 @@
-# Lecture: Setting Up a Sharded Cluster
+# Chapter 3: Sharding
+
+## Lecture: Setting Up a Sharded Cluster
 
 we're using the same key file for confg server and node
 
@@ -143,3 +145,167 @@ mongo --host m103-repl/192.168.103.100:27001 -u "m103-admin" -p "m103-pass" --au
 
 mongo --port 27001 -u "m103-admin" -p "m103-pass" --authenticationDatabase admin
 rs.add("192.168.103.100:27002")
+
+## Lecture: Config DB
+
+* Never need to write anything
+* Readonly
+
+Documents are stored by shard key values.
+
+Each shard holds certain range of shard key values.
+
+```bash
+mongo --port 26000 -u "m103-admin" -p "m103-pass" --authenticationDatabase admin
+```
+
+from mongos
+
+```javascript
+sh.status()
+
+use config
+
+db.databases.find().pretty()
+db.collections.find().pretty()
+db.shards.find().pretty()
+db.chunks.find().pretty()
+db.mongos.find().pretty()
+```
+
+## Lecture: Shard keys
+
+### Chunks: `{ x: 1 }` => (x<3), (3<=x<6), (6<=x)
+
+* Each shard contains a given chunk.
+When insert a new document,
+mongos checks which shard contains the appropriate chunk for that document's shard key value.
+* Shard key **must** be present in every document.
+* Ideally, shard key should support the majority of query, so the read operation can be targeted to the single shard.
+
+### Shard key
+
+* Shard key **must be indexed**. Create index and then select shard key
+* Shard key are **immutable**. CANNOT change/ update
+* CANNOT unshard
+
+### How to shard
+
+```javascript
+sh.enableSharding("<db>")
+
+db.<coll>.createIndex({ "<index>": 1 })
+
+// shard_key is an index
+sh.shardCollection("<db>.<coll>", { "<shard_key>": 1 })
+
+sh.status()
+```
+
+## Lecture: Picking shard key
+
+Not all collection need to be sharded.
+
+Good write value
+
+* Cardinality - high cardinality = many possible unique values (e.g. city > week_of_day > boolean)
+* Frequency - low frequency = low repetition of a given unique value (e.g. majority of users are in Auckland )
+* Monotonic Change - avoid monotonically changing (e.g. `insert_date` field is monotonically increasing. `_id` is not suitable for shard key)
+
+1. High cardinality
+1. Low frequency
+1. Non-Monotonically changing
+
+Try testing shard key in a staging environment first before production.
+Using `mongodump` and `mongorestore` utilities.
+
+## Lecture: Hashed shard key
+
+Chunk `{ x: 1 }` -> Hashing function -> shard
+
+* Data remains unhashed when saved
+* More even distributed when using a monotonically-changing shard key
+* Data are stored scattered. Range query will read from multiple shards
+* Cannot support geographically isolated read operations
+* Only on single non-array field
+* Lose index sorting
+
+```javascript
+sh.enableSHarding("<db>")
+db.<coll>.createIndex({ "<index>": "hashed" })
+sh.shardCollection("<db>.<coll>", { "<shard_key>": "hashed" })
+```
+
+## Lab 2 - Shard a Collection
+
+```bash
+mkdir /var/mongodb/db/{4,5,6}
+
+# copy chang update config
+cp node1.cfg node4.cfg
+
+cp node4.cfg node5.cfg
+cp node4.cfg node6.cfg
+
+# start mongod
+mongod -f node4.cfg
+mongod -f node5.cfg
+mongod -f node6.cfg
+
+# login to node4
+mongo --port 27004
+```
+
+```javascript
+use admin
+
+db.createUser({
+  user: "m103-admin",
+  pwd: "m103-pass",
+  roles: [
+    {role: "root", db: "admin"}
+  ]
+})
+
+db.auth("m103-admin", "m103-pass")
+
+rs.add("192.168.103.100:27005")
+rs.add("192.168.103.100:27006")
+rs.isMaster()
+```
+
+```bash
+mongo --port 26000 -u "m103-admin" -p "m103-pass" --authenticationDatabase admin
+```
+
+```javascript
+sh.addShard("m103-repl-2/192.168.103.100:27004")
+sh.status()
+```
+
+`products.json` is saved in Vagrant box `/dataset/` directory
+
+```bash
+mongoimport --drop /dataset/products.json --port 26000 -u "m103-admin" \
+-p "m103-pass" --authenticationDatabase "admin" \
+--db m103 --collection products
+```
+
+from `mongos`
+
+```javascript
+show dbs
+sh.enableSharding("m103")
+
+use m103
+db.products.count()
+db.products.find().limit(1).pretty()
+
+db.products.createIndex({ "sku": "hashed" })
+// db.adminCommand({ shardCollection: "m103.products", key: { "sku": 1 }})
+sh.shardCollection("m103.products", { "sku": "hashed" })
+
+sh.status()
+```
+
+## Lecture: Chunks
